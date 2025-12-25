@@ -1,0 +1,494 @@
+---
+title: "Final Project"
+author: "dongnili&ziliangsong"
+format: 
+  revealjs:
+    theme: moon
+    incremental: true
+    smaller: true
+    scrollable: true
+embed-resources: true
+---
+
+## A snapshot of the data set<!-- Main author: Ziliangsong -->
+```{r}
+#| echo: false
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+library(patchwork)
+library(gridExtra)
+library(corrplot)
+water <- read.csv("BKB_WaterQualityData_2020084.csv")
+
+```
+
+```{r}
+colnames(water)<-c("id","no","date","salinity","do","ph","secchi_depth","water_depth","water_temp","atc_1","atf","time","field.tech","dv","wv","air_temp","year")
+waternew<-select(water,-no,-date,salinity,do,ph,secchi_depth,water_depth,water_temp,-atc_1,-atf,-time,-field.tech,-dv,-wv,air_temp,-year)
+water_nona<-na.omit(waternew)
+wa11<-select(water_nona,-id)
+
+knitr::kable(head(water_nona,n=2))
+
+```
+-   id: Location of monitoring sites, which include a, b, bay, and c.
+-   salinity: Salinity of water, in parts per thousand (ppt)
+-   do: Dissolved oxygen concentration, in milligrams per liter (mg/L)
+-   ph: pH value indicates the acidity or alkalinity of water.
+-   secchi_depth: Visibility depth, measured using a Secchi disc, in metres.
+-   water_depth: Water depth in meters.
+-   water_temp: Water temperature in degrees Celsius (°C)
+-   air_temp: Air temperature in degrees Celsius (°C)
+
+---
+
+## Exploratory summaries<!-- Main author: Ziliangsong -->
+### Statistical summary
+```{r}
+## Create the summary table for Salinity and pH
+summary_table <- data.frame(
+  Variable = c("Salinity", "pH"),
+  Min = c(min(water_nona$salinity, na.rm = TRUE), min(water_nona$ph, na.rm = TRUE)),
+  Q1 = c(quantile(water_nona$salinity, 0.25, na.rm = TRUE), quantile(water_nona$ph, 0.25, na.rm = TRUE)),
+  Median = c(median(water_nona$salinity, na.rm = TRUE), median(water_nona$ph, na.rm = TRUE)),
+  Mean = c(mean(water_nona$salinity, na.rm = TRUE), mean(water_nona$ph, na.rm = TRUE)),
+  Q3 = c(quantile(water_nona$salinity, 0.75, na.rm = TRUE), quantile(water_nona$ph, 0.75, na.rm = TRUE)),
+  Max = c(max(water_nona$salinity, na.rm = TRUE), max(water_nona$ph, na.rm = TRUE)),
+  Missing_Values = c(sum(is.na(water_nona$salinity)), sum(is.na(water_nona$ph)))
+)
+
+# Create the summary table for Location (id)
+id_summary <- water_nona %>%
+  group_by(id) %>%
+  summarise(
+    Count = n(),
+    Percentage = round(n() / nrow(water_nona) * 100, 2)
+  )
+
+# Output both tables on the same slide
+knitr::kable(summary_table, caption = "Summary Statistics for Salinity and pH") 
+
+knitr::kable(id_summary, caption = "Summary Statistics for Location (id)")
+
+```
+
+---
+
+## Exploratory summaries<!-- Main author: Ziliangsong -->
+### Exploratory Charts
+```{r}
+#| echo: false
+library(patchwork)
+
+hist_salinity <- ggplot(water_nona,mapping = aes(x=salinity))+
+                    geom_histogram(binwidth = 0.3, 
+                                   fill = "skyblue")+
+                     labs(title = "frequency of salinity",
+                         x = "salinity")+
+                      theme_minimal()+
+                       facet_wrap(~id)
+hist_salinity
+```
+
+---
+
+## Exploratory summaries<!-- Main author: Ziliangsong -->
+### Exploratory Charts
+```{r}
+
+hist_ph <- ggplot(water_nona,mapping = aes(x=ph))+
+            geom_histogram(binwidth = 0.3, 
+                           fill = "skyblue")+
+             labs(title = "frequency of ph", x = "ph")+
+              theme_minimal()+
+               facet_wrap(~id)
+hist_ph
+```
+
+---
+
+## Exploratory summaries<!-- Main author: Ziliangsong -->
+### Exploratory Charts
+```{r}
+ph_id <- ggplot(water_nona, aes(x = id, y = ph)) + 
+  geom_boxplot(fill = "skyblue") +
+  labs(title = "Boxplot of pH Values Across 5 Locations",
+       x = "Location",
+       y = "pH Value")
+
+sali_id <- ggplot(water_nona, aes(x = id, y = salinity)) + 
+  geom_boxplot(fill = "skyblue") +
+  labs(title = "Boxplot of salinity Values Across 5 Locations",
+       x = "Location",
+       y = "salinity")
+
+ph_id /sali_id
+```
+
+---
+
+## Exploratory summaries<!-- Main author: Ziliangsong -->
+### pH variation over Salinity
+```{r}
+ggplot(water_nona, aes(x = salinity, y = ph)) +
+  geom_jitter(width = 0.2, height = 0.1, size = 0.7, alpha = 0.6, aes(color = id)) +
+  geom_smooth(method = "lm") +
+  scale_color_brewer(palette = "Set1") +
+  theme_minimal() +
+  labs(title = "salinity vs. ph", x = "salinity", y = "ph", color = "id")+ 
+  coord_cartesian(ylim = c(5, 10))+
+  labs(title = "salinity vs. ph", 
+       x = "salinity", y = "ph", color = "Location")
+```
+
+---
+
+## Exploratory summaries(1)<!-- Main author: Ziliangsong -->
+### pH vs. Salinity (Colored by Location)
+```{r}
+ggplot(water_nona, aes(x = salinity, 
+                       y = ph,colour = id)) +
+  geom_jitter(width = 0.2, height = 0.1, 
+              size = 0.7, alpha = 0.6, aes()) +
+  geom_smooth(method = "lm") +
+  scale_color_brewer(palette = "Set1") +
+  theme_minimal() +
+  labs(title = "salinity vs. ph", 
+       x = "salinity", y = "ph", color = "id")+ 
+  coord_cartesian(ylim = c(5, 10))+
+  facet_wrap(~id)
+```
+
+---
+
+## Fitted Model Summary(1)<!-- Main author: Ziliangsong -->
+### Model 1: Linear Relationship
+Model1 equation:$pH = \alpha + \beta_1 \cdot \text{Salinity} + \beta_2 \cdot \text{Location}$
+```{r}
+#| echo: false
+model1 <- lm(ph ~ salinity+id, 
+             data = water_nona)
+model1
+
+```
+- Pool B: Increases pH by 0.3573 units compared to Pool A, adjusted for salinity.
+- Bay: Increases pH by 0.2795 units compared to Pool A, adjusted for salinity.
+- Pool C: Increases pH by 0.36 units compared to Pool A, adjusted for salinity.
+- Pool D: Decreases pH by 0.1745 units compared to Pool A, adjusted for salinity.
+
+---
+
+## Fitted Model Summary(1)<!-- Main author: Ziliangsong -->
+### Model 1 Residual Diagnostics
+```{r}
+#| echo: false
+library(ggplot2)
+library(patchwork)
+
+# Residuals vs Fitted Values Plot
+plot1 <- ggplot(data.frame(fitted = model1$fitted.values, residuals = model1$residuals), 
+                aes(x = fitted, y = residuals)) +
+  geom_point(color = "blue", shape = 20) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "Residuals vs Fitted Values", x = "Fitted Values", y = "Residuals") 
+
+# QQ Plot
+plot2 <- ggplot(data.frame(residuals = model1$residuals), aes(sample = residuals)) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  labs(title = "QQ Plot", x = "Theoretical Quantiles", y = "Sample Quantiles") +
+  theme_minimal()
+
+
+plot1 + plot2
+
+```
+
+---
+
+## Fitted Model Summary(1)<!-- Main author: Ziliangsong -->
+### Model 2: Transforming the Response Variable
+Model 2 equation: $\sqrt{Y} = \alpha + \beta_1 \cdot \text{Salinity} + \beta_2 \cdot \text{Location}$
+```{r}
+#| echo: false
+wa12<-water_nona
+wa12$sqrtY<-sqrt(wa12$ph)
+model2<-lm(sqrtY ~ salinity+id, data=wa12)
+```
+
+```{r}
+#| echo: false
+library(ggplot2)
+library(patchwork)
+
+# Residuals vs Fitted Values Plot
+plot11 <- ggplot(data.frame(fitted = model2$fitted.values, residuals = model2$residuals), 
+                aes(x = fitted, y = residuals)) +
+  geom_point(color = "blue", shape = 20) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "Residuals vs Fitted Values", x = "Fitted Values", y = "Residuals")
+
+# QQ Plot
+plot22 <- ggplot(data.frame(residuals = model2$residuals), aes(sample = residuals)) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  labs(title = "QQ Plot", x = "Theoretical Quantiles", y = "Sample Quantiles") +
+  theme_minimal()
+
+
+plot11 + plot22
+
+```
+
+---
+
+## Exploratory summaries(2)<!-- Main author: Dongnili -->
+### Exploratory Charts
+```{r}
+#| echo: false
+library(gridExtra)
+
+p1 <- ggplot(water_nona, aes(x = salinity)) + 
+        geom_histogram(fill = 'skyblue', color = 'black') + 
+        ggtitle("Salinity")
+p2 <- ggplot(water_nona, aes(x = ph)) + 
+        geom_histogram(fill = 'skyblue', color = 'black') + 
+        ggtitle("pH")
+p3 <- ggplot(water_nona, aes(x = secchi_depth)) + 
+        geom_histogram(fill = 'skyblue', color = 'black') +
+        ggtitle("Secchi Depth")
+p4 <- ggplot(water_nona, aes(x = water_depth)) + 
+        geom_histogram(fill = 'skyblue', color = 'black') +
+        ggtitle("Water Depth")
+p5 <- ggplot(water_nona, aes(x = water_temp)) + 
+        geom_histogram(fill = 'skyblue', color = 'black') +
+        ggtitle("Water Temperature")
+p6 <- ggplot(water_nona, aes(x = air_temp)) + 
+        geom_histogram(fill = 'skyblue', color = 'black') + 
+        ggtitle("Air Temperature")
+
+
+grid.arrange(p1, p2, p3, p4, p5, p6, ncol = 3) 
+
+
+
+```
+
+---
+
+## Exploratory summaries(2)<!-- Main author: Dongnili -->
+### Correlation Matrix Heatmap
+```{r}
+cor <- cor(wa11)
+corrplot::corrplot(cor,method = "color",addCoef.col = "black")
+```
+
+---
+
+## Fitted Model Summary(2)<!-- Main author: Dongnili -->
+### Secchi Depth Model 1: Linear Relationship
+$Secchi Depth = α + β1*Salinity + β2*Dissolved Oxygen +\\ β3*pH + β4*WaterDepth + β5*WaterTemp + β6*AirTemp$
+```{r}
+#| echo: false
+reg_wa<-lm(secchi_depth~salinity+
+             do+ph+water_depth+water_temp+air_temp, 
+           data = water_nona)
+```
+
+```{r}
+step_result <- step(reg_wa, direction = "backward")
+step_summary <- step_result$anova
+```
+
+---
+
+## Fitted Model Summary(2)<!-- Main author: Dongnili -->
+### Secchi Depth Model 1 Residual Diagnostics
+```{r}
+#| echo: false
+library(ggplot2)
+library(patchwork)
+
+# Residuals vs Fitted Values Plot
+plot1 <- ggplot(data.frame(fitted = reg_wa$fitted.values, residuals = reg_wa$residuals), 
+                aes(x = fitted, y = residuals)) +
+  geom_point(color = "blue", shape = 20) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "Residuals vs Fitted Values", x = "Fitted Values", y = "Residuals") 
+
+# QQ Plot
+plot2 <- ggplot(data.frame(residuals = reg_wa$residuals), aes(sample = residuals)) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  labs(title = "QQ Plot", x = "Theoretical Quantiles", y = "Sample Quantiles") +
+  theme_minimal()
+
+
+plot1 + plot2
+```
+
+---
+
+## Fitted Model Summary(2)<!-- Main author: Dongnili -->
+### Model 2: Transforming the Response Variable
+$sqrtY = α + β1*Salinity + β2*DO + β3*pH \\+ β4*WaterDepth + β5*WaterTemp + β6*AirTemp$
+
+```{r}
+#| echo: false
+wa12$sqrtY<-sqrt(wa12$secchi_depth)
+reg_wa2<-lm(sqrtY~salinity+do+ph+water_depth+water_temp+air_temp, 
+            data = wa12)
+```
+
+```{r}
+#| echo: false
+library(ggplot2)
+library(patchwork)
+
+# Residuals vs Fitted Values Plot
+plot11 <- ggplot(data.frame(fitted = reg_wa2$fitted.values, residuals = reg_wa2$residuals), 
+                aes(x = fitted, y = residuals)) +
+  geom_point(color = "blue", shape = 20) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "Residuals vs Fitted Values", x = "Fitted Values", y = "Residuals")
+
+# QQ Plot
+plot22 <- ggplot(data.frame(residuals = reg_wa2$residuals), aes(sample = residuals)) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  labs(title = "QQ Plot", x = "Theoretical Quantiles", y = "Sample Quantiles") +
+  theme_minimal()
+
+
+plot11 + plot22
+
+```
+
+---
+
+## Fitted Model Summary(2)<!-- Main author: Dongnili -->
+### Model 2: Transforming the Response Variable
+
+:::: {.columns}
+
+::: {.column width="40%"}
+```{r}
+#| echo: false
+library(knitr)
+
+vif_results <- data.frame(
+  Variable = c("Salinity", "Dissolved oxygen", "pH", "Water Depth", "Water Temp", "Air Temp"),
+  VIF = c(1.273551, 1.653153, 1.177584, 1.033281, 2.196920, 1.659053)
+)
+
+kable(vif_results)
+```
+:::
+
+::: {.column width="60%"}
+```{r}
+#| echo: false
+library(knitr)
+
+results <- data.frame(
+  Variable = c("pH","Air Temp", "Water Temp","none",
+                "Dissolved Oxygen","Salinity", "Water Depth"),
+  AIC = c(-5180.3, -5178.6, -5178.4, -5178.3, -5170.1,-5142.9,-3836.2)
+)
+
+kable(results, format = "html", escape = FALSE) %>%
+  sub("(-3836.2)", '<span style="color:red;">\\1</span>', .)
+```
+:::
+
+::::
+- Final Regression Model After Stepwise Selection:$sqrtY = α + β1*Salinity + β2*DO\\+ β3*WaterDepth + β4*WaterTemp$
+
+---
+
+## Exploratory summaries(3)<!-- Main author: Dongnili -->
+### Exploratory Charts
+```{r}
+hist_do <- ggplot(water_nona,mapping = aes(x=do))+
+         geom_histogram(binwidth = 0.3, fill = "skyblue", color = "black")+
+         labs(title = "frequency of do", x = "do")
+boxplot_do <- ggplot(water_nona, aes(y = do)) +
+  geom_boxplot(fill = "skyblue") +
+  theme_minimal() +
+  labs(title = "Boxplot of do")
+
+hist_do + boxplot_do
+```
+
+---
+
+## Exploratory summaries(3)<!-- Main author: Dongnili -->
+### Exploratory Charts
+```{r}
+water_temp_hist <- ggplot(water_nona ,mapping = aes(x=water_temp))+
+         geom_histogram(binwidth = 0.3, fill = "skyblue")+
+         labs(title = "frequency of water temp", x = "water temperature")
+water_temp_boxplot <- 
+  ggplot(water_nona, aes(y = water_temp)) +
+  geom_boxplot(fill = "skyblue") +
+  theme_minimal() +
+  labs(title = "Boxplot of water temp")
+
+water_temp_hist + water_temp_boxplot
+```
+
+---
+
+## Exploratory summaries(3)<!-- Main author: Dongnili -->
+### Water Temperature Variation over Dissolved Oxygen
+```{r}
+ggplot(water_nona, aes(x = water_temp, y = do)) +
+  geom_jitter(width = 0.2, height = 0.1, size = 0.7, 
+              alpha = 0.6, aes()) +
+  geom_smooth(method = "lm") +
+  scale_color_brewer(palette = "Set1") +
+  theme_minimal() +
+  labs(title = "water temperature vs. dissolved oxygen", 
+       x = "water temperature", y = "dissolved oxygen", 
+       color = "Location")
+```
+
+---
+
+## Fitted Model Summary(3)<!-- Main author: Dongnili -->
+### Model Residual Diagnostics
+Model1 equation:$Dissolved Oxygen = \alpha + \beta_1 \cdot \text{Water Temperature}$
+```{r}
+#| echo: false
+model3 <- lm(do ~ water_temp, data = water_nona)
+```
+
+
+```{r}
+#| echo: false
+library(ggplot2)
+library(patchwork)
+
+# Residuals vs Fitted Values Plot
+plot1 <- ggplot(data.frame(fitted = model3$fitted.values, residuals = model3$residuals), 
+                aes(x = fitted, y = residuals)) +
+  geom_point(color = "blue", shape = 20) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "Residuals vs Fitted Values", x = "Fitted Values", y = "Residuals") 
+
+# QQ Plot
+plot2 <- ggplot(data.frame(residuals = model3$residuals), aes(sample = residuals)) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  labs(title = "QQ Plot", x = "Theoretical Quantiles", y = "Sample Quantiles") +
+  theme_minimal()
+
+
+plot1 + plot2
+
+```
+
+---
+
+# Thank you
